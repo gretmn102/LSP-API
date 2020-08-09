@@ -2340,7 +2340,37 @@ module Server =
                 let! result = handleRequest requestHandlings request lspServer
                 match result with
                 | Some response ->
-                    let responseString = JsonConvert.SerializeObject(response, jsonSettings)
+                    let responseString =
+                        // just dirty hack for nullable success
+                        if Option.isNone response.Result && Option.isNone response.Error then
+                            // let convertSetting =
+                            //     let result = JsonSerializerSettings()
+                            //     result.Converters.Add(OptionConverter())
+                            //     result.Converters.Add(ErasedUnionConverter())
+                            //     result.ContractResolver <- Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
+                            //     result
+                            // let x =
+                            //     {| Jsonrpc = response.Version; Id = response.Id; Result = () |}
+                            // JsonConvert.SerializeObject(x, convertSetting )
+
+                            let f () =
+                                use txt = new System.IO.StringWriter()
+                                use json = new JsonTextWriter(txt)
+                                json.WriteStartObject()
+                                json.WritePropertyName("jsonrpc")
+                                json.WriteValue response.Version
+                                json.WritePropertyName("id")
+                                match response.Id with
+                                | Some i ->
+                                    json.WriteValue i
+                                | None -> json.WriteNull()
+                                json.WritePropertyName("result")
+                                json.WriteNull()
+                                json.WriteEndObject()
+                                txt.ToString()
+                            f ()
+                        else
+                            JsonConvert.SerializeObject(response, jsonSettings)
                     sender.Post(responseString)
                 | None -> ()
             }
